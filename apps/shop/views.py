@@ -475,8 +475,7 @@ def sales_actions(request):
                 return JsonResponse({'success': True, 'sms': f'{format_num(product_qty)} items added to cart.', 'cart': cart_count})
             
             elif cart_delete:
-                cart_item = Cart.objects.get(id=cart_delete)
-                cart_item.delete()
+                Cart.objects.get(id=cart_delete).delete()
 
                 items_remaining = Cart.objects.filter(user=request.user)
                 cart_count = items_remaining.count() if items_remaining.count() < 10 else '9+'

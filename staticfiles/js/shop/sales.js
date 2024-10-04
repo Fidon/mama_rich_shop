@@ -189,6 +189,7 @@ $(function () {
                             $("#cart_items_btn").text(response.cart);
                             $('#grand_total_spn').text(response.grand_total);
                             $("#confirm_sales_form").load(location.href + " #confirm_sales_form");
+                            if (response.cart == 0) $("#cart_checkout_form").load(location.href + " #cart_checkout_form");
                             sales_table.draw();
                         } else {
                             btn_clicked.html(`<i class="fas fa-trash-alt"></i>`);
