@@ -57,6 +57,22 @@
           {% endif %}
         </div>
         {% if cart_count > 0 %}
+          <div class="d-block w-100 float-start px-1 mt-1 border-bottom border-color1 text-start text-color5">Customer details</div>
+          <div class="form-floating d-block w-100 float-start mt-1">
+            <input type="text" class="form-control text-color5" id="check_customerNames" placeholder="a" />
+            <label for="check_customerNames" class="form-label text-color5">Customer name(s)</label>
+          </div>
+          <div class="d-block w-100 float-start p-0 mt-1">
+            <select id="select_pay_type" class="d-block w-100 float-start py-3 px-1 rounded-2 text-color5">
+              <option value="">Select payment type</option>
+              <option value="Cash">Payment: Cash</option>
+              <option value="Credit">Payment: Credit</option>
+            </select>
+          </div>
+          <div class="form-floating d-block w-100 float-start mt-1">
+            <textarea class="form-control text-color5" id="check_comment" placeholder="d" style="min-height:120px;"></textarea>
+            <label for="check_comment" class="form-label text-color5">Comment(s) if any</label>
+          </div>
           <div class="cart shadow-sm rounded-2 mt-5">
             <span class="total_txt">GRAND TOTAL:</span>
             <span class="total_num" id="grand_total_spn">{{ total }}</span>
@@ -65,7 +81,7 @@
           <div class="form-floating w-100 float-start my-1 text-end">
             <button type="button" class="btn btn-secondary d-inline-block me-2" data-bs-dismiss="offcanvas"><i class="fas fa-long-arrow-left"></i></button>
             <button type="button" class="btn btn-yell text-white d-inline-block me-2" id="clear_cart_btn">Clear</button>
-            <button type="button" class="btn btn-color2 text-white d-inline-block" data-bs-toggle="modal" data-bs-target="#confirm_checkout_modal">Checkout</button>
+            <button type="button" class="btn btn-color2 text-white d-inline-block" id="checkoutModal_btn">Checkout</button>
           </div>
         {% endif %}
       </form>

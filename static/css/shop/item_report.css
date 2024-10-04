@@ -36,7 +36,8 @@
     margin-top: 15px;
     margin-bottom: 5px;
 }
-#contents table th input {
+#contents table th input,
+#contents table th select {
     border: 1px solid rgba(24, 132, 119, .6);
     padding-left: 3px;
     font-size: 13px;
@@ -53,6 +54,7 @@
 #contents .searchdiv input:focus,
 #contents .dataTables_length .form-select:focus,
 #contents table th input:focus,
+#contents table th select:focus,
 #date_filter_modal input:focus,
 #contents table td input:focus {
     border-color: #188477;;

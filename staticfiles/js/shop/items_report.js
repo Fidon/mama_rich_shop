@@ -48,6 +48,8 @@ $(function () {
             { data: 'price' },
             { data: 'qty' },
             { data: 'amount' },
+            { data: 'pay_type' },
+            { data: 'pay_status' },
             { data: 'user' },
         ],
         order: [[2, 'desc']],
@@ -66,11 +68,29 @@ $(function () {
             orderable: false,
         },
         {
-            targets: 2,
-            className: 'ellipsis text-start'
+            targets: [2, 6],
+            createdCell: function (cell, cellData, rowData, rowIndex, colIndex) {
+                $(cell).attr('class', 'ellipsis text-start');
+            }
         },
         {
-            targets: 6,
+            targets: [3, 5],
+            createdCell: function (cell, cellData, rowData, rowIndex, colIndex) {
+                $(cell).attr('class', 'text-end pe-2');
+            }
+        },
+        {
+            targets: 7,
+            createdCell: function (cell, cellData, rowData, rowIndex, colIndex) {
+                if (rowData.pay_status == 'Yes') {
+                    $(cell).attr('class', 'text-success');
+                } else {
+                    $(cell).attr('class', 'text-danger');
+                }
+            }
+        },
+        {
+            targets: 8,
             createdCell: function (cell, cellData, rowData, rowIndex, colIndex) {
                 var cell_content = `<a href="${rowData.user_info}" class="text-color1">${rowData.user}</a>`;
                 $(cell).attr('class', 'ellipsis text-start');
@@ -85,7 +105,7 @@ $(function () {
                 titleAttr: "Copy",
                 title: "Sales-items-report - ShopApp",
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8]
                 }
             },
             { // PDF button
@@ -99,7 +119,7 @@ $(function () {
                 pageSize: 'A4',
                 footer: true,
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6],
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8],
                     search: 'applied',
                     order: 'applied'
                 },
@@ -121,10 +141,12 @@ $(function () {
                         doc.content[1].table.body[i][1].alignment = 'center';
                         doc.content[1].table.body[i][2].alignment = 'left';
                         doc.content[1].table.body[i][3].alignment = 'right';
-                        doc.content[1].table.body[i][4].alignment = 'right';
+                        doc.content[1].table.body[i][4].alignment = 'center';
                         doc.content[1].table.body[i][5].alignment = 'right';
                         doc.content[1].table.body[i][6].alignment = 'left';
-                        doc.content[1].table.body[i][6].margin = [0, 0, 3, 0];
+                        doc.content[1].table.body[i][7].alignment = 'center';
+                        doc.content[1].table.body[i][8].alignment = 'left';
+                        doc.content[1].table.body[i][8].margin = [0, 0, 3, 0];
 
                         for (let j = 0; j < body[i].length; j++) {
                             body[i][j].style = "vertical-align: middle;";
@@ -139,7 +161,7 @@ $(function () {
                 titleAttr: "Export to Excel",
                 title: "Sales items report - ShopApp",
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8]
                 }
             },
             { // Print button
@@ -152,7 +174,7 @@ $(function () {
                 titleAttr: "Print",
                 footer: true,
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6],
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8],
                     search: 'applied',
                     order: 'applied'
                 },
@@ -191,7 +213,7 @@ $(function () {
         },
         initComplete: function() {
             var api = this.api();
-            api.columns([0, 1, 2, 3, 4, 5, 6]).eq(0).each(function (colIdx) {
+            api.columns([0, 1, 2, 3, 4, 5, 6, 7, 8]).eq(0).each(function (colIdx) {
                 var cell = $(".filters th").eq($(api.column(colIdx).header()).index());
                 if (colIdx == 1) {
                     var calendar =`<button type="button" class="btn btn-sm btn-color1 text-white" data-bs-toggle="modal" data-bs-target="#date_filter_modal"><i class="fas fa-calendar-alt"></i></button>`;
@@ -202,6 +224,28 @@ $(function () {
                     });
                     $("#date_filter_btn").on("click", function() {
                         items_report.draw();
+                    });
+                } else if (colIdx == 6) {
+                    var select = document.createElement("select");
+                    select.className = "select-filter text-color6";
+                    select.innerHTML = `<option value="">All</option>` +
+                    `<option value="Cash">Cash</option>` +
+                    `<option value="Credit">Credit</option>`;
+                    cell.html(select);
+
+                    $(select).on("change", function() {
+                        api.column(colIdx).search($(this).val()).draw();
+                    });
+                } else if (colIdx == 7) {
+                    var select = document.createElement("select");
+                    select.className = "select-filter text-color6";
+                    select.innerHTML = `<option value="">All</option>` +
+                    `<option value="Yes">Paid</option>` +
+                    `<option value="No">Unpaid</option>`;
+                    cell.html(select);
+
+                    $(select).on("change", function() {
+                        api.column(colIdx).search($(this).val()).draw();
                     });
                 } else if (colIdx == 0) {
                     cell.html("");

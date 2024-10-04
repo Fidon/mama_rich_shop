@@ -146,8 +146,9 @@ def inventory_page(request):
             queryset = queryset.filter(date_range_filters)
 
         # Base data from queryset
-        base_data = []
+        base_data, grand_amount = [], 0.0
         for product in queryset:
+            grand_amount += (product.price * product.qty)
             product_object = {
                 'id': product.id,
                 'regdate': product.regdate,
@@ -155,6 +156,7 @@ def inventory_page(request):
                 'names': product.names,
                 'qty': product.qty,
                 'price': product.price,
+                'amount': product.price * product.qty,
                 'expiry': product.expiry,
                 'exp_status': 1 if product.expiry is not None and product.expiry <= date.today() else 0,
                 'info': reverse('product_details', kwargs={'product_id': int(product.id)})
@@ -173,7 +175,8 @@ def inventory_page(request):
             3: 'names',
             4: 'qty',
             5: 'price',
-            6: 'expiry'
+            6: 'amount',
+            7: 'expiry'
         }
 
         # Apply sorting
@@ -192,7 +195,7 @@ def inventory_page(request):
             if column_search:
                 column_field = column_mapping.get(i)
                 if column_field:
-                    base_data = [item for item in base_data if filter_items(column_field, column_search, item, ('qty', 'price'))]
+                    base_data = [item for item in base_data if filter_items(column_field, column_search, item, ('qty', 'price', 'amount'))]
 
         # Apply global search
         if search_value:
@@ -221,6 +224,7 @@ def inventory_page(request):
                 'names': item.get('names'),
                 'qty': item.get('qty'),
                 'price': '{:,.2f}'.format(item.get('price'))+" TZS",
+                'amount': '{:,.2f}'.format(item.get('amount'))+" TZS",
                 'expiry': item.get('expiry').strftime('%d-%b-%Y') if item.get('expiry') else 'n/a',
                 'exp_status': item.get('exp_status'),
                 'info': item.get('info'),
@@ -232,6 +236,7 @@ def inventory_page(request):
             'recordsTotal': total_records,
             'recordsFiltered': records_filtered,
             'data': final_data,
+            'grand_amount': grand_amount,
         }
         return JsonResponse(ajax_response)
     return render(request, 'shop/inventory.html')
@@ -317,6 +322,7 @@ def product_details(request, product_id):
             'expiry': product_instance.expiry.strftime('%d-%b-%Y') if product_instance.expiry else 'n/a',
             'exp_status': int(product_instance.expiry is not None and product_instance.expiry <= date.today()),
             'comment': product_instance.comment or '',
+            'describe': product_instance.comment or 'n/a',
         }
         return render(request, 'shop/inventory.html', {'product': product_info})
     return redirect('inventory_page')
@@ -445,6 +451,9 @@ def sales_actions(request):
             cart_delete = request.POST.get('cart_delete')
             clear_cart = request.POST.get('clear_cart')
             checkout = request.POST.get('checkout')
+            sales_paid = request.POST.get('sales_paid')
+            item_remove = request.POST.get('item_remove')
+            sales_delete = request.POST.get('sales_delete')
 
             if add_to_cart:
                 product_id = request.POST.get('product')
@@ -481,6 +490,9 @@ def sales_actions(request):
                 return JsonResponse({'success': True})
             
             elif checkout:
+                payment_type = request.POST.get('payment')
+                customer_names = request.POST.get('customer').strip()
+                sale_comment = request.POST.get('comment').strip()
                 full_cart = Cart.objects.filter(user=request.user)
                 grand_amount, qty_status, qty_products = 0.0, True, []
 
@@ -492,8 +504,13 @@ def sales_actions(request):
 
                 if qty_status:
                     sale_transaction = Sales.objects.create(
-                        user=request.user,
-                        amount=grand_amount
+                        user = request.user,
+                        amount = grand_amount,
+                        paymentType = payment_type,
+                        paid = True if payment_type == 'Cash' else False,
+                        paydate = datetime.now().replace(tzinfo=pytz.UTC) if payment_type == 'Cash' else None,
+                        customer = 'n/a' if customer_names == '' else customer_names,
+                        comment = None if sale_comment == '' else sale_comment
                     )
 
                     for item in full_cart:
@@ -511,9 +528,40 @@ def sales_actions(request):
                 else:
                     products_str = ', '.join(qty_products)
                     return JsonResponse({'success': False, 'sms': f'Quantity mismatch for: <b>{products_str}</b>.<br>Reload page and correct qty.'})
-        
+
+            elif sales_paid:
+                sale_obj = Sales.objects.get(id=sales_paid)
+                sale_obj.paid = True
+                sale_obj.paydate = datetime.now().replace(tzinfo=pytz.UTC)
+                sale_obj.save()
+                return JsonResponse({'success': True, 'sms': 'Operation completed successfully.'})
+
+            elif item_remove:
+                item = Sale_items.objects.get(id=item_remove)
+                sale_obj = Sales.objects.get(id=item.sale_id)
+                product = Product.objects.get(id=item.product_id)
+                product.qty = product.qty + item.qty
+                sale_obj.amount = sale_obj.amount - (item.price * item.qty)
+                sale_obj.save()
+                product.save()
+                item.delete()
+                if not Sale_items.objects.filter(sale=sale_obj).exists():
+                    sale_obj.delete()
+                    return JsonResponse({'success': True, 'sales_page': reverse('sales_report'), 'items': 0})
+                return JsonResponse({'success': True, 'sms': 'Item removed successfully.', 'items': 1})
+
+            elif sales_delete:
+                sale_obj = Sales.objects.get(id=sales_delete)
+                get_items = Sale_items.objects.filter(sale=sale_obj)
+                for obj in get_items:
+                    product = Product.objects.get(id=obj.product_id)
+                    product.qty = product.qty + obj.qty
+                    product.save()
+                    obj.delete()
+                sale_obj.delete()
+                return JsonResponse({'success': True, 'sales_page': reverse('sales_report')})
+
         except Exception as e:
-            print(e)
             return JsonResponse({'success': False, 'sms': 'Unknown error, reload & try again'})
     
     return JsonResponse({'success': False, 'sms': 'Invalid data'})
@@ -537,6 +585,8 @@ def sales_report(request):
         # Date range filtering
         sale_start = parse_datetime(request.POST.get('start_date'), format_datetime, to_utc=True)
         sale_end = parse_datetime(request.POST.get('end_date'), format_datetime, to_utc=True)
+        paydate_start = parse_datetime(request.POST.get('paydate_start'), format_datetime, to_utc=True)
+        paydate_end = parse_datetime(request.POST.get('paydate_end'), format_datetime, to_utc=True)
         date_range_filters = Q()
 
         if sale_start and sale_end:
@@ -546,6 +596,14 @@ def sales_report(request):
                 date_range_filters |= Q(saledate__gte=sale_start)
             elif sale_end:
                 date_range_filters |= Q(saledate__lte=sale_end)
+        
+        if paydate_start and paydate_end:
+            date_range_filters |= Q(paydate__range=(paydate_start, paydate_end))
+        else:
+            if paydate_start:
+                date_range_filters |= Q(paydate__gte=paydate_start)
+            elif paydate_end:
+                date_range_filters |= Q(paydate__lte=paydate_end)
 
         if date_range_filters:
             queryset = queryset.filter(date_range_filters)
@@ -565,14 +623,25 @@ def sales_report(request):
                 }
                 for idx, item in enumerate(sale_items)
             ]
+
+            user_info_url = ""
+            if sale.user == request.user:
+                user_info_url = reverse('user_profile')
+            elif request.user.is_admin and not sale.user == request.user:
+                user_info_url = reverse('user_details', kwargs={'user_id': sale.user_id})
             
             sale_object = {
                 'id': sale.id,
                 'saledate': sale.saledate,
                 'user': sale.user.username,
+                'customer': sale.customer,
                 'amount': sale.amount,
+                'paytype': sale.paymentType,
+                'paidstatus': 'Yes' if sale.paid else 'No',
+                'paydate': sale.paydate,
                 'sale_items': sales_data,
-                'user_info': reverse('user_profile') if sale.user.is_admin else reverse('user_details', kwargs={'user_id': sale.user_id})
+                'sale_info': reverse('sale_details', kwargs={'sale_id': sale.id}),
+                'user_info': user_info_url
             }
             
             base_data.append(sale_object)
@@ -587,15 +656,22 @@ def sales_report(request):
             1: 'id',
             2: 'saledate',
             3: 'user',
-            4: 'amount',
+            4: 'customer',
+            5: 'amount',
+            6: 'paytype',
+            7: 'paidstatus',
+            8: 'paydate'
         }
 
         # Apply sorting
         order_column_name = column_mapping.get(order_column_index, 'saledate')
+        def none_safe_sort(item):
+            value = item.get(order_column_name)
+            return (value is None, value)
         if order_dir == 'asc':
-            base_data = sorted(base_data, key=lambda x: x[order_column_name], reverse=False)
+            base_data = sorted(base_data, key=none_safe_sort, reverse=False)
         else:
-            base_data = sorted(base_data, key=lambda x: x[order_column_name], reverse=True)
+            base_data = sorted(base_data, key=none_safe_sort, reverse=True)
 
         # Apply individual column filtering
         for i in range(len(column_mapping)):
@@ -629,9 +705,15 @@ def sales_report(request):
                 'id': item.get('id'),
                 'saledate': item.get('saledate').strftime('%d-%b-%Y %H:%M:%S'),
                 'user': item.get('user'),
+                'customer': item.get('customer'),
                 'amount': '{:,.2f}'.format(item.get('amount'))+" TZS",
+                'paytype': item.get('paytype'),
+                'paidstatus': item.get('paidstatus'),
+                'paydate': item.get('paydate').strftime('%d-%b-%Y %H:%M:%S') if item.get('paydate') else 'n/a',
                 'items': item.get('sale_items'),
                 'user_info': item.get('user_info'),
+                'sale_info': item.get('sale_info'),
+                'action': ''
             })
 
         ajax_response = {
@@ -643,6 +725,44 @@ def sales_report(request):
         }
         return JsonResponse(ajax_response)
     return render(request, 'shop/report.html')
+
+# product details
+@never_cache
+@login_required
+def sales_info(request, sale_id):
+    sale_instance = Sales.objects.filter(id=sale_id, user=request.user).first()
+    if request.user.is_admin:
+        sale_instance = Sales.objects.filter(id=sale_id).first()
+
+    if request.method == 'GET' and sale_instance:
+        sale_items_list, count_items = [], 1
+        get_items = Sale_items.objects.filter(sale=sale_instance)
+
+        for item in get_items:
+            sale_items_list.append({
+                'count': count_items,
+                'id': item.id,
+                'names': item.product.names,
+                'price': '{:,.2f}'.format(item.price)+' TZS',
+                'qty': int(item.qty) if item.qty == int(item.qty) else item.qty,
+                'amount': '{:,.2f}'.format(item.price*item.qty)+' TZS'
+            })
+            count_items += 1
+
+        sale_info = {
+            'id': sale_instance.id,
+            'saleDate': sale_instance.saledate.strftime('%d-%b-%Y %H:%M:%S'),
+            'saleUser': f'{sale_instance.user.fullname} ({sale_instance.user.username})',
+            'saleAmount': '{:,.2f}'.format(sale_instance.amount)+" TZS",
+            'customerNames': sale_instance.customer,
+            'paymentType': sale_instance.paymentType,
+            'paidStatus': 'Yes' if sale_instance.paid else 'No',
+            'payDate': sale_instance.paydate.strftime('%d-%b-%Y %H:%M:%S') if sale_instance.paydate else 'n/a',
+            'comment': sale_instance.comment if sale_instance.comment else 'n/a',
+            'items': sale_items_list
+        }
+        return render(request, 'shop/report.html', {'sales': sale_info})
+    return redirect('sales_report')
 
 # Sale items report
 @never_cache
@@ -680,6 +800,13 @@ def sales_items_report(request):
         base_data, sales_total = [], 0.0
         for item in queryset:
             sales_total += item.price * item.qty
+
+            user_info_url = ""
+            if item.sale.user == request.user:
+                user_info_url = reverse('user_profile')
+            elif request.user.is_admin and not item.sale.user == request.user:
+                user_info_url = reverse('user_details', kwargs={'user_id': item.sale.user_id})
+
             sale_object = {
                 'id': item.id,
                 'saledate': item.sale.saledate,
@@ -687,8 +814,10 @@ def sales_items_report(request):
                 'price': item.price,
                 'qty': item.qty,
                 'amount': item.price * item.qty,
+                'paytype': item.sale.paymentType,
+                'paidstatus': 'Yes' if item.sale.paid else 'No',
                 'user': item.sale.user.username,
-                'user_info': reverse('user_profile') if item.sale.user.is_admin else reverse('user_details', kwargs={'user_id': item.sale.user_id})
+                'user_info': user_info_url
             }
             
             base_data.append(sale_object)
@@ -705,7 +834,9 @@ def sales_items_report(request):
             3: 'price',
             4: 'qty',
             5: 'amount',
-            6: 'user'
+            6: 'paytype',
+            7: 'paidstatus',
+            8: 'user'
         }
 
         # Apply sorting
@@ -750,6 +881,8 @@ def sales_items_report(request):
                 'price': '{:,.2f}'.format(item.get('price'))+" TZS",
                 'qty': '{:,.0f}'.format(item.get('qty')),
                 'amount': '{:,.2f}'.format(item.get('amount'))+" TZS",
+                'pay_type': item.get('paytype'),
+                'pay_status': item.get('paidstatus'),
                 'user': item.get('user'),
                 'user_info': item.get('user_info'),
             })

@@ -14,6 +14,7 @@
           <a class="nav-link active" data-bs-toggle="tab" href="#product_info_div">Information</a>
         </li>
       </ul>
+
       <div class="tab_container">
         <div id="product_info_div" class="tab_div">
           <h5>Product information..</h5><hr class="my-1" />
@@ -49,6 +50,9 @@
               {% else %}
                 {{ product.expiry }}
               {% endif %}
+            </div>
+            <div class="w-100">
+              <b>Comment(s):</b> &nbsp; {{ product.describe|linebreaks }}
             </div>
 
             <div class="d-block w-100 py-3">
@@ -156,10 +160,35 @@
             <th>ProductNames</th>
             <th>Stock</th>
             <th>PriceEach</th>
+            <th>Amount</th>
             <th>ExpiryDate</th>
             <th>Action</th>
           </tr>
         </thead>
+        <tfoot class="fs-6 text-color5 border">
+          <tr>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th>PAGE TOTAL:</th>
+            <th class="text-end"></th>
+            <th></th>
+            <th></th>
+          </tr>
+          <tr>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th>GRAND TOTAL:</th>
+            <th class="text-end"></th>
+            <th></th>
+            <th></th>
+          </tr>
+        </tfoot>
       </table>
     </div>
 

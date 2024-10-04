@@ -43,6 +43,11 @@ class Sales(models.Model):
     saledate = models.DateTimeField(default=dtime)
     user = models.ForeignKey(CustomUser, on_delete=models.PROTECT, related_name='sales_user')
     amount = models.FloatField()
+    paymentType = models.CharField(max_length=10, default='Cash')
+    paid = models.BooleanField(default = False)
+    paydate = models.DateTimeField(null=True, default=None)
+    customer = models.CharField(max_length=255, default='no-name')
+    comment = models.TextField(null=True, default=None)
     objects = models.Manager()
     
     def __str__(self):

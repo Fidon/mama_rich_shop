@@ -123,6 +123,10 @@ $(function () {
         $('#exp_max_date').val('');
     }
 
+    function formatCurrency(num) {
+        return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' TZS';
+    };
+
     $("#products_table thead tr").clone(true).attr('class','filters').appendTo('#products_table thead');
     var products_table = $("#products_table").DataTable({
         fixedHeader: true,
@@ -141,6 +145,11 @@ $(function () {
             },
             dataType: 'json',
             headers: { 'X-CSRFToken': CSRF_TOKEN },
+            dataSrc: function (json) {
+                var tableFooter = $('#products_table tfoot');
+                $(tableFooter).find('tr').eq(1).find('th').eq(6).html(formatCurrency(json.grand_amount));
+                return json.data;
+            },
         },
         columns: [
             { data: 'count' },
@@ -149,6 +158,7 @@ $(function () {
             { data: 'names' },
             { data: 'qty' },
             { data: 'price' },
+            { data: 'amount' },
             { data: 'expiry' },
             { data: 'action' },
         ],
@@ -163,16 +173,20 @@ $(function () {
         bSort: true,
         orderCellsTop: true,
         columnDefs: [{
-            "targets": [0, 7],
+            "targets": [0, 8],
             "orderable": false,
         },
         {
             targets: 3,
-            className: 'ellipsis text-start',
+            createdCell: function(cell, cellData, rowData, rowIndex, colIndex) {
+                $(cell).attr('class','ellipsis text-start');
+            }
         },
         {
-            targets: 5,
-            className: 'text-end pe-2',
+            targets: [5, 6],
+            createdCell: function(cell, cellData, rowData, rowIndex, colIndex) {
+                $(cell).attr('class','text-end pe-2');
+            }
         },
         {
             targets: 4,
@@ -180,14 +194,14 @@ $(function () {
                 if (rowData.qty <= 10) {
                     $(cell).attr('class', 'text-danger text-end pe-2');
                     $(cell).attr('title', 'Low in store');
-                    $(cell).html(`<i class="fas fa-exclamation-circle"></i> `+rowData.qty);
+                    // $(cell).html(`<i class="fas fa-exclamation-circle"></i> `+rowData.qty);
                 } else {
                     $(cell).attr('class', 'text-end pe-2');
                 }
             }
         },
         {
-            targets: 6,
+            targets: 7,
             createdCell: function(cell, cellData, rowData, rowIndex, colIndex) {
                 if (rowData.exp_status == 1) {
                     $(cell).attr('class', 'text-danger');
@@ -197,7 +211,7 @@ $(function () {
             }
         },
         {
-            targets: 7,
+            targets: 8,
             className: 'align-middle text-nowrap text-center',
             createdCell: function (cell, cellData, rowData, rowIndex, colIndex) {
                 var cell_content = `<a href="${rowData.info}" class="btn btn-color1 text-white btn-sm">View</a>`;
@@ -213,7 +227,7 @@ $(function () {
                 titleAttr: "Copy",
                 title: "Inventory products - ShopApp",
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7]
                 }
             },
             { // PDF button
@@ -227,7 +241,7 @@ $(function () {
                 pageSize: 'A4',
                 footer: true,
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6],
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7],
                     search: 'applied',
                     order: 'applied'
                 },
@@ -251,8 +265,9 @@ $(function () {
                         doc.content[1].table.body[i][3].alignment = 'left';
                         doc.content[1].table.body[i][4].alignment = 'center';
                         doc.content[1].table.body[i][5].alignment = 'left';
-                        doc.content[1].table.body[i][6].alignment = 'center';
-                        doc.content[1].table.body[i][6].margin = [0, 0, 3, 0];
+                        doc.content[1].table.body[i][6].alignment = 'left';
+                        doc.content[1].table.body[i][7].alignment = 'center';
+                        doc.content[1].table.body[i][7].margin = [0, 0, 3, 0];
 
                         for (let j = 0; j < body[i].length; j++) {
                             body[i][j].style = "vertical-align: middle;";
@@ -267,7 +282,7 @@ $(function () {
                 titleAttr: "Export to Excel",
                 title: "Inventory products - ShopApp",
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7]
                 }
             },
             { // Print button
@@ -280,7 +295,7 @@ $(function () {
                 titleAttr: "Print",
                 footer: true,
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6],
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7],
                     search: 'applied',
                     order: 'applied'
                 },
@@ -293,9 +308,33 @@ $(function () {
                 }
             }
         ],
+        footerCallback: function (row, data, start, end, display) {
+            var api = this.api(), data;
+            
+            var intVal = function ( i ) {
+                return typeof i === 'string' ?
+                    i.replace(/[\s,]/g, '')
+                     .replace(/TZS/g, '')
+                     * 1 :
+                    typeof i === 'number' ?
+                        i : 0;
+            };
+            
+            var amountTotal = api
+                .column(6)
+                .data()
+                .reduce(function (a, b) {
+                    return intVal(a) + intVal(b);
+                }, 0);
+
+            var pageTotalValue = formatCurrency(amountTotal);
+            var tableFooter = $(api.table().footer());
+
+            $(tableFooter).find('tr').eq(0).find('th').eq(6).html(pageTotalValue);
+        },
         initComplete: function() {
             var api = this.api();
-            api.columns([0, 1, 2, 3, 4, 5, 6, 7]).eq(0).each(function (colIdx) {
+            api.columns([0, 1, 2, 3, 4, 5, 6, 7, 8]).eq(0).each(function (colIdx) {
                 var cell = $(".filters th").eq($(api.column(colIdx).header()).index());
                 if (colIdx == 1) {
                     var calendar =`<button type="button" class="btn btn-sm btn-color1 text-white" data-bs-toggle="modal" data-bs-target="#reg_date_filter_modal"><i class="fas fa-calendar-alt"></i></button>`;
@@ -317,7 +356,7 @@ $(function () {
                     $("#date_filter_btn").on("click", function() {
                         products_table.draw();
                     });
-                } else if (colIdx == 6) {
+                } else if (colIdx == 7) {
                     var calendar =`<button type="button" class="btn btn-sm btn-color1 text-white" data-bs-toggle="modal" data-bs-target="#expiry_filter_modal"><i class="fas fa-calendar-alt"></i></button>`;
                     cell.html(calendar);
                     $("#exp_date_clear").on("click", function() {
@@ -327,7 +366,7 @@ $(function () {
                     $("#exp_date_filter_btn").on("click", function() {
                         products_table.draw();
                     });
-                } else if (colIdx == 0 || colIdx == 7) {
+                } else if (colIdx == 0 || colIdx == 8) {
                     cell.html("");
                 } else {
                     $(cell).html("<input type='text' class='text-color6' placeholder='Filter..'/>");

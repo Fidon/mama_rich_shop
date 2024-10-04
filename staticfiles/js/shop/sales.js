@@ -237,9 +237,18 @@ $(function () {
                     }
                 });
             }
+        } else if (clicked.is('#checkoutModal_btn')) {
+            if ($('#select_pay_type').val() == "") {
+                $("#cart_checkout_form .formsms").html(generate_errorsms(false, 'Please select payment type.'));
+            } else {
+                $('#confirm_checkout_modal').modal('show');
+            }
         } else if (clicked.is('#checkout_confirm_btn')) {
             var formData = new FormData();
             formData.append('checkout', 'checkout');
+            formData.append('payment', $('#select_pay_type').val());
+            formData.append('customer', $('#check_customerNames').val());
+            formData.append('comment', $('#check_comment').val());
 
             $.ajax({
                 type: 'POST',

@@ -7,68 +7,266 @@
   <link href="{% static 'css/shop/report.css' %}" rel="stylesheet" type="text/css" />
 {% endblock %}
 {% block contents %}
-  <div class="searchdiv input-group w-100 float-start">
-    <input type="text" class="form-control text-color6 fs-6" id="sales_search" placeholder="Search.." autocomplete="off" />
-    <button type="button" class="btn btn-color1 text-white ms-1" id="sales_filter_clear" title="Clear filters"><i class="fas fa-refresh"></i></button>
-  </div>
+  {% if sales %}
+    <div class="sale_info">
+      <ul class="nav nav-tabs">
+        <li class="nav-item">
+          <a class="nav-link active" data-bs-toggle="tab" href="#sale_info_div">Information</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="tab" href="#sale_items_div">Sale items</a>
+        </li>
+      </ul>
+      <div class="tab_container">
+        <div id="sale_info_div" class="tab_div">
+          <h5>Sale information..</h5><hr class="my-1" />
+          <div class="info">
+            <div>
+              <b>Sold on:</b> &nbsp; {{ sales.saleDate }}
+            </div>
+            <div>
+              <b>Sold by:</b> &nbsp; {{ sales.saleUser }}
+            </div>
+            <div>
+              <b>Sale amount:</b> &nbsp; {{ sales.saleAmount }}
+            </div>
+            <div>
+              <b>Payment type:</b> &nbsp; {{ sales.paymentType }}
+            </div>
+            <div>
+              <b>Customer names:</b> &nbsp; {{ sales.customerNames }}
+            </div>
+            <div>
+              <b>Paid status:</b> &nbsp;{% if sales.paidStatus == 'No' %}
+                <span class="text-danger">{{ sales.paidStatus }} (Unpaid)</span>
+              {% else %}
+                <span class="text-success">{{ sales.paidStatus }} (Paid)</span>
+              {% endif %}
+            </div>
+            <div>
+              <b>Payment date:</b> &nbsp; {{ sales.payDate }}
+            </div>
+            <div class="w-100">
+              <b>Comment(s):</b> &nbsp; {{ sales.comment|linebreaks }}
+            </div>
 
-  <div class="d-block w-100 float-start my-2 table-responsive">
-    <table class="table text-color5 text-center align-middle table-striped" id="reports_table">
-      <thead>
-        <tr class="bg-color1 text-white">
-          <th></th>
-          <th>S/n</th>
-          <th>SaleDate</th>
-          <th>User</th>
-          <th>TotalAmout</th>
-        </tr>
-      </thead>
-      <tfoot class="text-center fs-6 text-color5">
-        <tr>
-          <th></th>
-          <th></th>
-          <th></th>
-          <th>PAGE TOTAL:</th>
-          <th></th>
-        </tr>
-        <tr>
-          <th></th>
-          <th></th>
-          <th></th>
-          <th>GRAND TOTAL:</th>
-          <th></th>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
-
-  <div class="modal fade" id="date_filter_modal">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header bg-color2">
-          <h6 class="modal-title text-white">Sale dates..</h6>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="form-floating d-block w-100 float-start my-1">
-            <input type="date" class="form-control text-color6" id="min_date" placeholder="d" />
-            <label for="min_date" class="text-color6">Minimum date</label>
-          </div>
-          <div class="form-floating d-block w-100 float-start my-1">
-            <input type="date" class="form-control text-color6" id="max_date" placeholder="d" />
-            <label for="max_date" class="text-color6">Maximum date</label>
+            <div class="d-block w-100 py-3">
+              {% if sales.paidStatus == 'No' %}
+                <button type="button" class="btn btn-color2 text-white d-inline-block m-2" data-bs-toggle="modal" data-bs-target="#paid_modal">Mark as paid</button>
+              {% endif %}
+              {% if request.user.is_admin %}
+                <button type="button" class="btn btn-yell text-white d-inline-block m-2" data-bs-toggle="modal" data-bs-target="#confirm_delete_modal">Delete</button>
+              {% endif %}
+            </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-long-arrow-left"></i></button>
-          <button type="button" class="btn btn-color2 text-white" id="date_clear"><i class="fas fa-refresh"></i></button>
-          <button type="button" class="btn btn-success" data-bs-dismiss="modal" id="date_filter_btn"><i class="fas fa-check-circle"></i></button>
+        <div id="sale_items_div" class="tab_div table-responsive">
+          <table class="table text-color5 text-center align-middle table-striped" id="sale_items_table">
+            <thead>
+              <tr class="bg-color2 text-white">
+                <th>S/n</th>
+                <th>ItemNames</th>
+                <th>ItemPrice</th>
+                <th>SaleQty</th>
+                <th>ItemAmount</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in sales.items %}
+                <tr>
+                  <td>{{ item.count }}</td>
+                  <td class="text-start">{{ item.names }}</td>
+                  <td class="text-end pe-2">{{ item.price }}</td>
+                  <td>{{ item.qty }}</td>
+                  <td class="text-end pe-2">{{ item.amount }}</td>
+                  <td>
+                    {% if request.user.is_admin %}
+                      <button class="btn btn-sm btn-yell text-white" id="salebtn_{{ item.id }}"><i class="fas fa-trash-alt"></i></button>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="text-center fs-6 text-color5">
+              <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th>TOTAL AMOUNT:</th>
+                <th class="text-end">{{ sales.saleAmount }}</th>
+                <th></th>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
     </div>
-  </div>
 
-  <input type="hidden" value="{% url 'sales_report' %}" id="sale_report_url" />
+    <div class="modal fade" id="confirm_delete_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-color2">
+            <h6 class="modal-title text-white">Delete sale record..</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="formsms d-block float-start w-100 text-start"></div>
+            <div class="form-floating d-block w-100 float-start text-color5 fs-6 py-3 my-1">Are you sure you want to delete this sale(s) record..?</div>
+            <input type="hidden" id="sales_info_id" value="{{ sales.id }}" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-color2 text-white" data-bs-dismiss="modal" id="cancel_delete_btn"><i class="fas fa-times-circle"></i> No</button>
+            <button type="button" class="btn btn-danger" id="confirm_delete_btn"><i class="fas fa-check-circle"></i> Yes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="paid_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-color2">
+            <h6 class="modal-title text-white">Confirm sale as paid..</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="formsms d-block float-start w-100 text-start"></div>
+            <div class="form-floating d-block w-100 float-start text-color5 fs-6 py-3 my-1">Mark this sale record as paid..?</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-yell text-white" data-bs-dismiss="modal" id="cancel_paid_btn"><i class="fas fa-arrow-left"></i> No</button>
+            <button type="button" class="btn btn-color2 text-white" id="confirm_paid_btn"><i class="fas fa-check-circle"></i> Continue</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="delete_item_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-color2">
+            <h6 class="modal-title text-white">Delete sale item..</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="formsms d-block float-start w-100 text-start"></div>
+            <div class="form-floating d-block w-100 float-start text-color5 fs-6 py-3 my-1">Are you sure you want to delete this item..?</div>
+            <input type="hidden" id="sale_item_id" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-color2 text-white" data-bs-dismiss="modal" id="cancel_item_btn"><i class="fas fa-times-circle"></i> No</button>
+            <button type="button" class="btn btn-danger" id="confirm_item_btn"><i class="fas fa-check-circle"></i> Yes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <input type="hidden" id="sales_actions_url" value="{% url 'sales_actions' %}" />
+  {% else %}
+    <div class="searchdiv input-group w-100 float-start">
+      <input type="text" class="form-control text-color6 fs-6" id="sales_search" placeholder="Search.." autocomplete="off" />
+      <button type="button" class="btn btn-color1 text-white ms-1" id="sales_filter_clear" title="Clear filters"><i class="fas fa-refresh"></i></button>
+    </div>
+
+    <div class="d-block w-100 float-start my-2 table-responsive">
+      <table class="table text-color5 text-center align-middle table-striped" id="reports_table">
+        <thead>
+          <tr class="bg-color1 text-white">
+            <th></th>
+            <th>S/n</th>
+            <th>SaleDate</th>
+            <th>User</th>
+            <th>Customer</th>
+            <th>TotalAmout</th>
+            <th>PayType</th>
+            <th>PaidStatus</th>
+            <th>PayDate</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tfoot class="text-center fs-6 text-color5">
+          <tr>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th>PAGE TOTAL:</th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+          </tr>
+          <tr>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th>GRAND TOTAL:</th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="modal fade" id="date_filter_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-color2">
+            <h6 class="modal-title text-white">Sale dates..</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-floating d-block w-100 float-start my-1">
+              <input type="date" class="form-control text-color6" id="min_date" placeholder="d" />
+              <label for="min_date" class="text-color6">Minimum date</label>
+            </div>
+            <div class="form-floating d-block w-100 float-start my-1">
+              <input type="date" class="form-control text-color6" id="max_date" placeholder="d" />
+              <label for="max_date" class="text-color6">Maximum date</label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-long-arrow-left"></i></button>
+            <button type="button" class="btn btn-color2 text-white" id="date_clear"><i class="fas fa-refresh"></i></button>
+            <button type="button" class="btn btn-success" data-bs-dismiss="modal" id="date_filter_btn"><i class="fas fa-check-circle"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="paydate_filter_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-color2">
+            <h6 class="modal-title text-white">Payment dates..</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-floating d-block w-100 float-start my-1">
+              <input type="date" class="form-control text-color6" id="paymin_date" placeholder="d" />
+              <label for="paymin_date" class="text-color6">Minimum date</label>
+            </div>
+            <div class="form-floating d-block w-100 float-start my-1">
+              <input type="date" class="form-control text-color6" id="paymax_date" placeholder="d" />
+              <label for="paymax_date" class="text-color6">Maximum date</label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-long-arrow-left"></i></button>
+            <button type="button" class="btn btn-color2 text-white" id="paydate_clear"><i class="fas fa-refresh"></i></button>
+            <button type="button" class="btn btn-success" data-bs-dismiss="modal" id="paydate_filter_btn"><i class="fas fa-check-circle"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <input type="hidden" value="{% url 'sales_report' %}" id="sale_report_url" />
+  {% endif %}
 {% endblock %}
 {% block scripts %}
   <script src="{% static 'js/shop/report.js' %}"></script>
